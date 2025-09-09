@@ -1,8 +1,7 @@
-
-#Create security group with firewall rules
+# Create security group with firewall rules
 resource "aws_security_group" "Test_security_group" {
   name        = var.security_group
-  description = "security group for Ec2 instance"
+  description = "Security group for Jenkins EC2 instance"
 
   ingress {
     from_port   = 8080
@@ -11,42 +10,49 @@ resource "aws_security_group" "Test_security_group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
- ingress {
+  ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
- # outbound from jenkis server
+  # Outbound: allow all traffic
   egress {
     from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags= {
+  tags = {
     Name = var.security_group
   }
 }
 
-# Create AWS ec2 instance
+# Fallback logic for AMI
+locals {
+  selected_ami = try(data.aws_ami.dev_ami.id, var.ami_id)
+}
+
+# Create AWS EC2 instance
 resource "aws_instance" "TestInstance" {
-  ami           = data.aws_ami.dev_ami.id
-  key_name = var.key_name
-  instance_type = var.instance_type
-  security_groups= [var.security_group]
-  tags= {
+  ami                    = local.selected_ami
+  key_name               = var.key_name
+  instance_type          = var.instance_type
+  vpc_security_group_ids = [aws_security_group.Test_security_group.id]
+
+  tags = {
     Name = var.tag_name
   }
 }
 
 # Create Elastic IP address
 resource "aws_eip" "TestInstance" {
-  vpc      = true
   instance = aws_instance.TestInstance.id
-tags= {
+  vpc      = true
+
+  tags = {
     Name = "my_elastic_ip"
   }
 }
